@@ -163,7 +163,6 @@ int userfs_posix_read(int fd, uint8_t *buf, int count)
 	
 	//struct inode * inode = f->ip;
 	int ret = userfs_file_read(f, buf, count);
-	clock_gettime(CLOCK_REALTIME, &ts_end2);
 	
 	pthread_rwlock_unlock(&f->rwlock);
 	if(ret!=count)

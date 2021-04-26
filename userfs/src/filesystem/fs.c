@@ -3062,7 +3062,6 @@ do_io_aligned:
 	if (enable_perf_stats)
 		start_tsc = asm_rdtscp();
 	
-	clock_gettime(CLOCK_REALTIME, &ts_end3);
 	uint32_t size;
 	list_for_each_entry_safe(bh, _bh, &io_list, b_io_list) {
 

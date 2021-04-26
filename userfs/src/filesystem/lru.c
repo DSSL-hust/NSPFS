@@ -112,7 +112,7 @@ int insert_lru_node(inode_lru_t* lru, const void* key, size_t key_len, unsigned 
 		return 0;
 	}
 
-	node = new_or_expire_lru_node(lru, key, key_len)
+	node = new_or_expire_lru_node(lru, key, key_len);
 	if(node->key){
 		free(node->key);
 	}
