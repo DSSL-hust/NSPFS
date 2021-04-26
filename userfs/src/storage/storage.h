@@ -82,7 +82,7 @@ int hdd_wait_io(uint8_t dev);
 int hdd_readahead(uint8_t dev, addr_t blockno, uint32_t io_size);
 void hdd_exit(uint8_t dev);
 
-extern uint64_t *bandwidth_consumption;
+//extern uint64_t *bandwidth_consumption;
 
 #ifdef __cplusplus
 }

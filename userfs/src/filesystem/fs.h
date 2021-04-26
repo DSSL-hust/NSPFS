@@ -1102,7 +1102,7 @@ extern uint8_t shm_slab_index;
 extern pthread_rwlock_t *shm_slab_rwlock; 
 extern pthread_rwlock_t *shm_lru_rwlock; 
 
-extern uint64_t *bandwidth_consumption;
+//extern uint64_t *bandwidth_consumption;
 
 
 // Bitmap bits per block

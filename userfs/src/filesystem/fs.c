@@ -284,7 +284,7 @@ static void shared_memory_init(void)
 
 	shm_slab_index = 0;
 	shared_slab_init(shm_slab_index);
-	bandwidth_consumption = (uint64_t *)shm_base;
+	//bandwidth_consumption = (uint64_t *)shm_base;
 
 	lru_heads = (struct list_head *)shm_base + 128;
 	
