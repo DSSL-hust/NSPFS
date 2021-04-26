@@ -4,9 +4,6 @@
 #include "global/global.h"
 #include "global/types.h"
 #include "global/defs.h"
-//#include "log/log.h"
-//#include "filesystem/stat.h"
-//#include "filesystem/shared.h"
 #include "global/mem.h"
 #include "global/ncx_slab.h"
 #include "stat.h"
@@ -14,8 +11,6 @@
 #include "io/buffer_head.h"
 #include "io/block_io.h"
 #include "io/device.h"
-//#include "filesystem/extents.h"
-//#include "filesystem/extents_bh.h"
 #include "ds/uthash.h"
 #include "ds/khash.h"
 #include "filesystem/lru.h"
@@ -28,16 +23,9 @@ extern "C" {
 static inline struct inode *icache_alloc_add(uint32_t inum);
 
 
-// libuserfs Disk layout:
-// [ boot block | sb block | inode blocks | free bitmap | data blocks | log blocks ]
-// [ inode block | free bitmap | data blocks | log blocks ] is a block group.
-// If data blocks is full, then file system will allocate a new block group.
-// Block group expension is not implemented yet.
-
 typedef unsigned short		umode_t;
 typedef unsigned int	uid_t;
 typedef unsigned int	gid_t;
-//typedef long long 	loff_t;
 
 typedef struct {
 	uid_t val;
@@ -370,22 +358,15 @@ struct fuckfs_addr_info *ADDRINFO;
 extern int bitmapnum;
 
 static uint32_t find_inode_bitmap(){
-	//printf("find_inode_bitmap function %lu, %lu, %lu\n",logaddr,logstart,logend);
 	int i;
 	uint32_t ino;
-	//userfs_info("inode bitmapnum is %d, inonum %d\n", bitmapnum,inonum);
 	pthread_mutex_lock(bitmap_lock);
 	for(i =bitmapnum;i<inonum;i++){
-		//userfs_info("fsinode_table[%d] %d\n",i,fsinode_table[i]);
 		if(fsinode_table[i]!=0){
 			ino= fsinode_table[i];
 			fsinode_table[i]=0;
-			//ino=ino>>inode_shift;
-			//userfs_info("inode ino is %d\n", ino);
 			bitmapnum=i+1;
-			//userfs_info("1inode bitmapnum is %d\n", bitmapnum);
 			pthread_mutex_unlock(bitmap_lock);
-			//printf("find_inode_bitmap ino %d\n",ino);
 			return ino;
 		}
 	}
@@ -394,19 +375,12 @@ static uint32_t find_inode_bitmap(){
 }
 
 static uint32_t put_inode_bitmap(uint32_t ino){
-	//userfs_info("put_inode_bitmap function %d\n",ino);
 	int i;
-	//uint32_t ino;
 	pthread_mutex_lock(bitmap_lock);
-	//userfs_info("00inode bitmapnum is %d\n", bitmapnum);
 	for(i =bitmapnum-1;i>=0;i--){
-		//userfs_info("fsinode_table[%d] %d\n",i,fsinode_table[i]);
 		if(fsinode_table[i]==0){
-			//ino= fsinode_table[i];
 			fsinode_table[i]=ino;
-			//ino=ino>>inode_shift;
 			bitmapnum=i;
-			//userfs_info("11inode bitmapnum is %d\n", bitmapnum);
 			pthread_mutex_unlock(bitmap_lock);
 			return ino;
 		}
@@ -416,12 +390,9 @@ static uint32_t put_inode_bitmap(uint32_t ino){
 }
 
 
-//#define NVMSIZE 6*1024*1024
 #define NVMSIZE 10*1024*1024 //40GB
 static uint64_t allocate_nvmblock(uint64_t blocks){
-	//userfs_info("allocate_nvmblock %d\n",blocks);
 	uint64_t alloc_nspace;
-	//userfs_info("ADDRINFO->nvm_block_addr %d\n", ADDRINFO->nvm_block_addr);
 	pthread_mutex_lock(allonvm_lock);
 	if(ADDRINFO->nvm_block_addr+blocks<=NVMSIZE){
 		alloc_nspace = ADDRINFO->nvm_block_addr <<g_block_size_shift; //4K 地址-->字節地址
@@ -429,20 +400,13 @@ static uint64_t allocate_nvmblock(uint64_t blocks){
 		ADDRINFO->nvm_block_addr+=blocks;
 		
 	}else if(ADDRINFO->nvm_block_addr+blocks>NVMSIZE){
-		//userfs_printf("ADDRINFO->nvm_block_addr %d\n", ADDRINFO->nvm_block_addr);
 		ADDRINFO->nvm_block_addr = nvmstartblock;
 		alloc_nspace = ADDRINFO->nvm_block_addr <<g_block_size_shift; //4K 地址-->字節地址
-		//size =blocks;
 		ADDRINFO->nvm_block_addr+=blocks;
 
-		// = ADDRINFO->nvm_block_addr<<g_block_size_shift; //字節地址
-		//size =NVMSIZE-ADDRINFO->nvm_block_addr;
-		//ADDRINFO->nvm_block_addr+=size;
 		
 	}
-	//userfs_info("blocks %d, alloc_nspace %ld\n",blocks,alloc_nspace);
 	pthread_mutex_unlock(allonvm_lock);
-	//printf("ADDRINFO->nvm_block_addr %ld\n", ADDRINFO->nvm_block_addr);
 	return alloc_nspace;
 }
 
@@ -474,8 +438,6 @@ static uint64_t allocate_ssdblocks(uint64_t blocks, uint8_t flag){
 	return allospace;
 }
 static uint64_t allocate_ssd1block(){
-	//printf("allocate_ssdblock1\n");
-	//userfs_info("ADDRINFO->ssd1_block_addr %ld, ADDRINFO->ssd2_block_addr %ld, ADDRINFO->ssd3_block_addr %ld\n", ADDRINFO->ssd1_block_addr,ADDRINFO->ssd2_block_addr,ADDRINFO->ssd3_block_addr);
 	uint64_t allospace;
 	pthread_mutex_lock(allossd1_lock);
 	allospace=ADDRINFO->ssd1_block_addr<<21; //2M block address  --> byte address
@@ -485,8 +447,6 @@ static uint64_t allocate_ssd1block(){
 }
 
 static uint64_t allocate_ssd2block(){
-	//printf("allocate_ssdblock2\n");
-	//userfs_info("ADDRINFO->ssd1_block_addr %ld, ADDRINFO->ssd2_block_addr %ld, ADDRINFO->ssd3_block_addr %ld\n", ADDRINFO->ssd1_block_addr,ADDRINFO->ssd2_block_addr,ADDRINFO->ssd3_block_addr);
 	uint64_t allospace;
 	pthread_mutex_lock(allossd2_lock);
 	allospace=ADDRINFO->ssd2_block_addr<<21; //2M block address  --> byte address
@@ -496,8 +456,7 @@ static uint64_t allocate_ssd2block(){
 }
 
 static uint64_t allocate_ssd3block(){
-	//printf("allocate_ssdblock3\n");
-	//userfs_info("ADDRINFO->ssd1_block_addr %ld, ADDRINFO->ssd2_block_addr %ld, ADDRINFO->ssd3_block_addr %ld\n", ADDRINFO->ssd1_block_addr,ADDRINFO->ssd2_block_addr,ADDRINFO->ssd3_block_addr);
+	
 	uint64_t allospace;
 	pthread_mutex_lock(allossd3_lock);
 	allospace=ADDRINFO->ssd3_block_addr<<21; //2M block address  --> byte address
@@ -516,32 +475,6 @@ static int lru_upsert(uint32_t ino, char* filename){
 		printf("error insert to lru\n");
 	}
 	return ret;
-/*
-	struct list_head* head = &(inodelru->lru_nodes);
-	struct list_head* p = NULL;
-	printf("lru_list-------------------------------------------\n");
-	list_for_each(p,head){
-		lru_node_t* node = list_entry(p, lru_node_t, lru_list);
-		printf("key is %s %d\n",node->key,node->ino);
-	}
-	printf("lru_list-------------------------------------------\n");
-
-	size_t idx = inodelru->options.num_slot;
-	printf("+++++++++++++++++++++++\n");
-	for(int i=0;i<idx;i++){
-		
-		printf("i is %d\n",i);
-		
-		head = inodelru->hash_slots + i;
-		p = NULL;
-		list_for_each(p, head){
-			lru_node_t* node = list_entry(p, lru_node_t, hash_list);
-			printf("key is %s\n",node->key);
-			
-		}
-	}
-	printf("+++++++++++++++++++++++\n");
-*/
 }
 
 
@@ -555,23 +488,15 @@ static void devicecommit(){
 } 
 
 static void append_addrinfo_log(){
-	//printf("append_addrinfo_log %d\n",logoffset);
 	uint64_t flag=4095;
 	uint64_t offset = logoffset;
 	if ((logoffset&flag)>(4096-sizeof(struct fuckfs_addr_info))){
 		offset = (logoffset >>page_shift +1)<<page_shift;
 	}
-	//printf("offset %d\n", offset);
-
-	//printf("sizeof %d\n", sizeof(uint64_t));
+	
 	pthread_mutex_lock(applog_lock);
 	logaddr = logstart + offset;
-	//printf("memcpy0 %d\n",ADDRINFO->nvm_block_addr );
-	//printf("memcpy1 %d\n",ADDRINFO->ssd1_block_addr);
-	//printf("memcpy2 %d\n",ADDRINFO->ssd2_block_addr);
-	//printf("memcpy3 %d\n",ADDRINFO->ssd3_block_addr);
 	ADDRINFO->free_inode_base = fsinode_table[bitmapnum];
-	//printf("memcpy4 %d\n", ADDRINFO->free_inode_base);
 #if 0
 	ADDRINFO->ssd1_block_addr=(ADDRINFO->ssd1_block_addr+511)>>9;
 	ADDRINFO->ssd2_block_addr=(ADDRINFO->ssd2_block_addr+511)>>9;
@@ -579,201 +504,94 @@ static void append_addrinfo_log(){
 #endif	
 	memcpy(logaddr, ADDRINFO, sizeof(struct fuckfs_addr_info));
 	msync(logaddr,sizeof(struct fuckfs_addr_info), MS_SYNC);
-	/*offset+=64;
-	logaddr = logstart + offset;
-	printf("memcpy2 %d\n",ssd2_block_addr);
-	memcpy(logaddr, &ssd2_block_addr, 64);
-	offset+=64;
-	logaddr = logstart + offset;
-	printf("memcpy3 %d\n",ssd3_block_addr);
-	memcpy(logaddr, &ssd3_block_addr, 64);
-	*/
 	pthread_mutex_unlock(applog_lock);
-	//printf("append_addr_info_log end %d\n", sizeof(uint64_t));
 }
 
 static void submit_log(){
 	printf("submit_log logstart %ld, logbase %ld, logoffset %ld\n",logstart,logbase,logoffset);
-	//syscall(337,logname,logstart-logbase,logstart + logoffset-logbase);
 }
 static void append_entry_log(struct fuckfs_extent *entry, uint8_t flag){
-	//printf("append_entry_log function flag %d\n",flag);
 	
 	pthread_mutex_lock(applog_lock);
-	//printf("append_entry_log function logoffset %d, total entry num %d\n",logoffset,entrynum++);
 	if(logoffset+sizeof(struct fuckfs_dentry) > logspace){
 		userfs_info("logoffset %d\n",logoffset);
 		submit_log();
 		logoffset=0;
 	}
 	logaddr = logstart + logoffset;
-	//printf("entry ino is %d\n", entry->ino);
-	//printf("append_entry_log function %lu, %lu, %lu\n",logaddr,logstart,logend);
+
 	if(flag==0){
-		//printf("append_entry_log memcpy1\n");
+		
 		memcpy(logaddr, entry, sizeof(struct fuckfs_extent));
-		//printf("fuckfs_extent->entry_type %d\n",entry->entry_type);
+		
 		msync(logaddr,sizeof(struct fuckfs_extent), MS_SYNC);
-		//printf("append_entry_log function1\n");
+		
 		logoffset += sizeof(struct fuckfs_extent);
 	}else{
-		//printf("append_entry_log %d\n",(logoffset&(g_block_size_bytes-1))+sizeof(struct fuckfs_dentry));
+		
 		if((logoffset&(g_block_size_bytes-1))+sizeof(struct fuckfs_dentry) >g_block_size_bytes){
-			//printf("align log\n");
+			
 			memset(logaddr,0,g_block_size_bytes-(logoffset&(g_block_size_bytes-1)));
 			logoffset=(logoffset&(~(g_block_size_bytes-1))) +g_block_size_bytes;
 			logaddr= logstart+logoffset;
-			//printf("offset %d\n", logoffset);
 		}
-		//printf("append_entry_log function %lu, %lu, %lu\n",logaddr,logstart,logend);
 		memcpy(logaddr, entry, sizeof(struct fuckfs_dentry));
-		//printf("fuckfs_dentry->entry_type %d\n",entry->entry_type);
 		msync(logaddr,sizeof(struct fuckfs_dentry), MS_SYNC);
 
-		//printf("append_entry_log function2\n");
 		logoffset += sizeof(struct fuckfs_dentry);
 	}
 	pthread_mutex_unlock(applog_lock);
-	//printf("end append_entry_log function %lu\n",logaddr);
 }
 
-//extern uint32_t allocate_NVMBlock =64;
-//extern uint32_t allocate_SSDBlock = 64*1024;
-/*
-static void allocate_block(struct inode* inode, uint32_t allocate_NVMBlock, uint32_t allocate_SSDBlock){
-	uint32_t i, size, allnvm,allssd;
-	allnvm = allocate_NVMBlock;
-	allssd = allocate_SSDBlock;
-	struct space *tmpspace;
-	//struct space nvmspace,ssdspace;
-	//INIT_LIST_HEAD(&nvmspace.list);
-	//INIT_LIST_HEAD(&ssdspace.list);
-	for(i=0;i<nrangenum;i++){
-		size = nblock_table[i][1]-nblock_table[i][0];
-		tmpspace =(struct space*)malloc(sizeof(struct space));
-		if(size>=allnvm){
-			tmpspace->startaddr = nblock_table[i][0];
-			tmpspace->endaddr = nblock_table[i][0]+allnvm;
-			nblock_table[i][0] = nblock_table[i][0]+allnvm;
-			tmpspace->size = allnvm;
-			allnvm = 0;
-		}else{  //size < allnvm
-			tmpspace->startaddr = nblock_table[i][0];
-			tmpspace->endaddr = nblock_table[i][1];
-			tmpspace->size =size;
-			allnvm = allnvm -size;
-			nblock_table[i][0] = 0;
-			nblock_table[i][1] = 0;
-		}
-		list_add_tail(&(tmpspace->list),&(inode->nvmspace->list));
-		if(allnvm<=0){
-			break;
-		}
-	}
-	inode->nvmsize = allocate_NVMBlock - allnvm;
-	for(i=0;i<srangenum;i++){
-		size = sblock_table[i][1]-sblock_table[i][0];
-		tmpspace =(struct space*)malloc(sizeof(struct space));
-		if(size>=allssd){
-			tmpspace.startaddr = sblock_table[i][0];
-			tmpspace.endaddr = sblock_table[i][0]+allssd;
-			nblock_table[i][0] = sblock_table[i][0]+allssd;
-			tmpspace.size = allssd;
-			allnvm = 0;
-		}else{  //size < allnvm
-			tmpspace.startaddr = sblock_table[i][0];
-			tmpspace.endaddr = sblock_table[i][1];
-			tmpspace.size =size;
-			allssd = allssd -size;
-			sblock_table[i][0] = 0;
-			sblock_table[i][1] = 0;
-		}
-		list_add_tail(&tmpspace.list,&inode->ssdspace.list);
-		if(allssd<=0){
-			break;
-		}
-	}
-	inode->nvmsize = allocate_SSDBlock - allssd;
-	
-	//inode->nvmspace =&nvmspace;
-	//inode->ssdspace = &ssdspace;
-}
-
-*/
 //获取ino, filetype
-//理想情况，获取这个dir的所有dentry,包括ino,filetype, and filename
 static struct ufs_direntry * fetch_ondisk_dentry_from_kernel(struct inode *inode, char * filename){
-	//userfs_printf("fetch_ondisk_dentry_from_kernel filename %s, ino %d\n",filename, inode->inum);
 	uint64_t ino_ftype;
 	struct ufs_direntry *ude;
 	uint64_t suffix =3;
 	ino_ftype=syscall(338, inode->inum, filename, strlen(filename));
-	//userfs_info("filename %s, ino_ftype %lu\n",filename, ino_ftype);
 	if(ino_ftype>0){
 		ude = (struct ufs_direntry *)malloc(sizeof(struct ufs_direntry));
 		struct fs_direntry *de = (struct fs_direntry *)malloc(sizeof(struct fs_direntry));
 		de->ino= ino_ftype & (~ suffix);
 		de->file_type= ino_ftype & suffix;
-		//printf("de->ino %ld\n",de->ino);
-		//printf("de->filetype %d\n",de->file_type);
 		de->name_len = strlen(filename);
 		strcpy(de->name, filename);
        	ude->addordel = Ondisk;
 		ude->direntry=de;
-		//userfs_info("art_insert filename is %s, inode->inum %d\n", filename,inode->inum);
 		pthread_rwlock_wrlock(&inode->art_rwlock);
 		art_insert(&inode->dentry_tree, filename,de->name_len,ude);
 		pthread_rwlock_unlock(&inode->art_rwlock);
 	}else{
 		return NULL;
 	}
-	//userfs_info("ude is %lu\n",ude);
 	return ude;
-//inode->inum, filename
+
 }
 
 
 static int fetch_ondisk_dentry(struct inode *inode){
-	//printf("fetch_ondisk_dentry %s\n",filename);
-	userfs_printf("inode->root is %d\n",inode->root);
 	char *blk_base= (char *)malloc(4096*sizeof(char));
 	memcpy(blk_base, mmapstart+inode->root, 4096);
-	//printf("blk_base %s\n", blk_base);
 	struct fs_direntry *de;
 
 	int rlen;
 	de = (struct fs_direntry *)blk_base;
-	//printf("de->ino is %d\n",de->ino);
-	//printf("de->name is %s\n",de->name);
 	char *top = blk_base + 4096;
 	while ((char *)de <= top) {
 		char dename[256];
-		//userfs_info("de is %lu\n",de);
-		//userfs_info("top is %lu\n",top);
-		//获取的旧数据
-       // userfs_info("dentry ino is %d\t %d\t %s\n", de->ino, de->de_len,de->name);
-        //userfs_info("de->name_len %d\n", de->name_len);
         memmove(dename,de->name,de->name_len);
         dename[de->name_len]='\0';
-        //userfs_info("deneme is %s\n", dename);
         rlen = le16_to_cpu(de->de_len);
-        //if(rlen>4000){
-        //	printf("rlen>4000\n");
-        //	rlen=16;
-        //}
+       
         if (de->ino && rlen!=0) {
         	struct ufs_direntry *ude = (struct ufs_direntry *)malloc(sizeof(struct ufs_direntry));
         	ude->addordel = Ondisk;
 			ude->direntry=de;
-			//userfs_printf("art_insert deneme is %s, de->name_len %d\n", dename,de->name_len);
 			pthread_rwlock_wrlock(&inode->art_rwlock);
 			art_insert(&inode->dentry_tree, dename,de->name_len,ude);
 			pthread_rwlock_unlock(&inode->art_rwlock);
         	de = (struct fs_direntry *)((char *)de + rlen);
 
-            //nlen = UFS_DIR_REC_LEN(de->name_len);
-            //printf("nlen is %d\n",nlen);
-           	//printf("rlen is %d\n",rlen);
         }else
            	break;
         
@@ -792,7 +610,6 @@ static struct inode *fetch_ondisk_inode_ino(uint32_t ino)
 	u64 inodeoff;
 	char cinode[128];
 	struct pmfs_inode * pinode;
-	//inodeoff= ino << inode_shift;
 	inodeoff= ino;
 	memcpy(cinode,mmapstart+ inodebase + inodeoff, 128);
 	pinode = (struct pmfs_inode *)cinode;
@@ -817,9 +634,7 @@ static struct inode *fetch_ondisk_inode_ino(uint32_t ino)
     	inode->itype=T_FILE;
     else
     	inode->itype=T_DEV;
-	//userfs_info("inode->size is %d, inode->ctime.tv_sec is %d\n", inode->size, inode->ctime.tv_sec);
-	//userfs_info("pinode->height is %d, root is %d\n", pinode->height, pinode->root);
-
+	
 	inode->de_cache = NULL;
 	pthread_spin_init(&inode->de_cache_spinlock, PTHREAD_PROCESS_SHARED);
     pthread_mutex_init(&inode->i_mutex, NULL);
@@ -831,18 +646,11 @@ static struct inode * inodecopy(struct tmpinode * tinode)
 {
 	//userfs_info("inodecopy function %lu, %lu, %lu\n",logaddr,logstart,logend);
 	struct inode *inode= icache_alloc_add(tinode->i_ino);
-	//printf("icache_alloc_add\n");
-	//struct inode *
-	//uint32_t ino =tinode->i_ino;
-	//inode = icache_alloc_add(ino);
-	//struct inode *inode =(struct inode *)malloc(sizeof(struct inode));
 	if(!inode){
 		panic("inode is null\n");
 	}
 	inode->i_mode = tinode->i_mode;
-    //inode->i_opflags = tinode->i_opflags;
-    //inode->i_uid = tinode->i_uid;
-    //inode->i_gid = tinode->i_gid;
+  
     inode->flags = tinode->i_flags;
     //inode->inum = tinode->i_ino;
     inode->nlink = tinode->i_nlink;
@@ -851,13 +659,7 @@ static struct inode * inodecopy(struct tmpinode * tinode)
     inode->atime = tinode->i_atime;
     inode->mtime = tinode->i_mtime;
     inode->ctime = tinode->i_ctime;
-    /*
-    inode->i_atime.tv_nsec = tinode->i_atime.tv_nsec;
-    inode->i_mtime.tv_sec = tinode->i_mtime.tv_sec;
-    inode->i_mtime.tv_nsec = tinode->i_mtime.tv_nsec/1000;
-    inode->i_ctime.tv_sec = tinode->i_ctime.tv_sec;
-    inode->i_ctime.tv_nsec = tinode->i_ctime.tv_nsec/1000;
-    */
+   
 
     if(S_ISDIR(inode->i_mode))
     	inode->itype=T_DIR;
@@ -865,9 +667,7 @@ static struct inode * inodecopy(struct tmpinode * tinode)
     	inode->itype=T_FILE;
     else
     	inode->itype=T_DEV;
-    //inode->i_blkbits = tinode->i_blkbits;
     inode->blocks = tinode->i_blocks;
-    //inode->i_state = tinode->i_state;
 	inode->height = tinode->height;
     inode->root = tinode->root;
     inode->i_blk_type = tinode->i_blk_type;
@@ -883,7 +683,6 @@ static inline struct inode *icache_find( uint32_t inum)
 {
 	struct inode *inode;
 
-	//userfs_assert(dev == g_root_dev);
 
 	pthread_rwlock_rdlock(icache_rwlock);
 
@@ -897,22 +696,18 @@ static inline struct inode *icache_find( uint32_t inum)
 
 static inline struct inode *icache_alloc_add(uint32_t inum)
 {
-	//printf("icache_alloc_add\n");
 	struct inode *inode;
 	pthread_rwlockattr_t rwlattr;
 
-	//userfs_assert(dev == g_root_dev);
 
 	inode = (struct inode *)malloc(sizeof(*inode));
 
 	if (!inode)
 		panic("Fail to allocate inode\n");
-	//printf("inode\n");
-	//inode->dev = dev;
+	
 	inode->inum = inum;
 	inode->i_ref = 1;
-	//printf("inode set\n");
-	//inode->_dinode = (struct dinode *)inode;
+	
 
 #if 0
 	pthread_rwlockattr_setpshared(&rwlattr, PTHREAD_PROCESS_SHARED);
@@ -931,9 +726,7 @@ static inline struct inode *icache_alloc_add(uint32_t inum)
 	pthread_spin_init(&inode->de_cache_spinlock, PTHREAD_PROCESS_SHARED);
 	inode->de_cache = NULL;
 #endif
-	//printf("pthread_rwlock_wrlock\n");
 	pthread_rwlock_wrlock(icache_rwlock);
-	//printf("HASH_ADD\n");
 	HASH_ADD(hash_handle, inode_hash, inum,
 	 		sizeof(uint32_t), inode);
 
@@ -945,7 +738,6 @@ static inline struct inode *icache_alloc_add(uint32_t inum)
 static inline struct inode *icache_add(struct inode *inode)
 {
 	uint32_t inum = inode->inum;
-	//printf("inum %d\n", inum);
 	pthread_mutex_init(&inode->i_mutex, NULL);
 	
 	pthread_rwlock_wrlock(icache_rwlock);
@@ -954,7 +746,6 @@ static inline struct inode *icache_add(struct inode *inode)
 	 		sizeof(uint32_t), inode);
 
 	pthread_rwlock_unlock(icache_rwlock);
-	//printf("inode->inum %d\n", inode->inum);
 	return inode;
 }
 
@@ -972,32 +763,28 @@ static inline int icache_del(struct inode *ip)
 #ifdef KLIB_HASH
 static inline struct fcache_block *fcache_find(struct inode *inode, offset_t key)
 {
-	//printf("in fcache_find1 %d\n",key);
 	khiter_t k;
 	struct fcache_block *fc_block = NULL;
 
 	pthread_rwlock_rdlock(&inode->fcache_rwlock);
 
-	//printf("kh_get %lx\n",inode->fcache_hash);
 	k = kh_get(fcache, inode->fcache_hash, key);
-	//printf("kh_end k %ld,kh_end() %ld\n",k,kh_end(inode->fcache_hash));
+	
 	if (k == kh_end(inode->fcache_hash)) {
 		pthread_rwlock_unlock(&inode->fcache_rwlock);
-		//printf("return NULL\n");
+		
 		return NULL;
 	}
-	//printf("kh_value %ld\n",k);
 	fc_block = kh_value(inode->fcache_hash, k);
 
 	pthread_rwlock_unlock(&inode->fcache_rwlock);
-	//printf("fc_block %lx\n", fc_block);
+
 	return fc_block;
 }
 
 static inline struct fcache_block *fcache_alloc_add(struct inode *inode, 
 		offset_t key, addr_t log_addr)
 {
-	//printf("fcache_alloc_add\n");
 	struct fcache_block *fc_block;
 	khiter_t k;
 	int ret;
@@ -1019,15 +806,8 @@ static inline struct fcache_block *fcache_alloc_add(struct inode *inode,
 	k = kh_put(fcache, inode->fcache_hash, key, &ret);
 	if (ret < 0)
 		panic("fail to insert fcache value");
-	/*
-	else if (!ret) {
-		kh_del(fcache, inode->fcache_hash, k);
-		k = kh_put(fcache, inode->fcache_hash, key, &ret);
-	}
-	*/
 
 	kh_value(inode->fcache_hash, k) = fc_block;
-	//userfs_info("add key %u @ inode %u\n", key, inode->inum);
 
 	pthread_rwlock_unlock(&inode->fcache_rwlock);
 
@@ -1046,14 +826,6 @@ static inline int fcache_del(struct inode *inode,
 		kh_del(fcache, inode->fcache_hash, k);
 		inode->n_fcache_entries--;
 	}
-
-	/*
-	if (k != kh_end(inode->fcache_hash)) {
-		kh_del(fcache, inode->fcache_hash, k);
-		inode->n_fcache_entries--;
-		userfs_debug("del key %u @ inode %u\n", fc_block->key, inode->inum);
-	}
-	*/
 
 	pthread_rwlock_unlock(&inode->fcache_rwlock);
 
@@ -1086,7 +858,6 @@ static inline int fcache_del_all(struct inode *inode)
 #else
 static inline struct fcache_block *fcache_find(struct inode *inode, offset_t key)
 {
-	//printf("in fcache_find2\n");
 	struct fcache_block *fc_block = NULL;
 
 	pthread_rwlock_rdlock(&inode->fcache_rwlock);
@@ -1102,7 +873,6 @@ static inline struct fcache_block *fcache_find(struct inode *inode, offset_t key
 static inline struct fcache_block *fcache_alloc_add(struct inode *inode, 
 		offset_t key, addr_t log_addr)
 {
-	//printf("fcache_alloc_add\n");
 	struct fcache_block *fc_block;
 
 	fc_block = (struct fcache_block *)userfs_zalloc(sizeof(*fc_block));
@@ -1167,18 +937,15 @@ static inline int fcache_del_all(struct inode *inode)
 static inline struct inode *de_cache_find(struct inode *dir_inode, 
 		const char *_name)
 {
-	//printf("de_cache_find name %s\n", _name);
 	struct dirent_data *dirent_data;
-	//printf("dir_inode de_cache %lu\n", dir_inode->de_cache);
 	HASH_FIND_STR(dir_inode->de_cache, _name, dirent_data);
 
 	
 	if (dirent_data) {
-		//*offset = dirent_data->offset;
-		//userfs_info("dirent_data->name %s\n", dirent_data->name);
+		
 		return dirent_data->inode;
 	} else {
-		//*offset = 0;
+
 		return NULL;
 	}
 }
@@ -1186,24 +953,19 @@ static inline struct inode *de_cache_find(struct inode *dir_inode,
 static inline struct inode *de_cache_alloc_add(struct inode *dir_inode, 
 		const char *name, struct inode *inode)
 {
-	//printf("de_cache_alloc_add dir_inode ino %d, name %s, inode ino %d\n",dir_inode->inum, name,inode->inum);
 	struct dirent_data *_dirent_data;
 
 	_dirent_data = (struct dirent_data *)malloc(sizeof(*_dirent_data));
 	if (!_dirent_data)
 		panic("Fail to allocate dirent data\n");
 
-	//printf("de_cache_alloc_add1\n");
 	strcpy(_dirent_data->name, name);
 
 	_dirent_data->inode = inode;
-	//_dirent_data->offset = _offset;
-	//printf("de_cache_alloc_add2 %lu\n",dir_inode->de_cache_spinlock);
 	pthread_spin_lock(&dir_inode->de_cache_spinlock);
-	//printf("de_cache_alloc_add3\n");
+	
 	HASH_ADD_STR(dir_inode->de_cache, name, _dirent_data);
-	//printf("de_cache_alloc_add4\n");
-
+	
 	dir_inode->n_de_cache_entry++;
 
 	pthread_spin_unlock(&dir_inode->de_cache_spinlock);
@@ -1214,7 +976,6 @@ static inline struct inode *de_cache_alloc_add(struct inode *dir_inode,
 
 static inline int de_cache_del(struct inode *dir_inode, const char *_name)
 {
-	//printf("de_cache_del dir_inode ino %d, name %s\n",dir_inode->inum,_name);
 	struct dirent_data *dirent_data;
 
 	HASH_FIND_STR(dir_inode->de_cache, _name, dirent_data);
@@ -1230,7 +991,6 @@ static inline int de_cache_del(struct inode *dir_inode, const char *_name)
 
 static inline struct inode *dlookup_find(const char *path)
 {
-	userfs_info("dlookup_find path %s, dlookup_rwlock %lu\n",path,dlookup_rwlock);
 	struct dlookup_data *_dlookup_data;
 
 	pthread_rwlock_rdlock(dlookup_rwlock);
@@ -1244,14 +1004,12 @@ static inline struct inode *dlookup_find(const char *path)
 		return NULL;
 	}
 	else{
-		//userfs_info("dlookup_find _dlookup_data %lu, inode %lu\n", _dlookup_data,_dlookup_data->inode);
 		return _dlookup_data->inode;
 	}
 }
 
 static inline struct inode *dlookup_alloc_add(	struct inode *inode, const char *_path)
 {
-	//userfs_info("dlookup_alloc_add %s, inode %lu, \n", _path,inode);
 	struct dlookup_data *_dlookup_data;
 
 	_dlookup_data = (struct dlookup_data *)userfs_zalloc(sizeof(*_dlookup_data));
@@ -1262,7 +1020,6 @@ static inline struct inode *dlookup_alloc_add(	struct inode *inode, const char *
 
 	_dlookup_data->inode = inode;
 
-	//userfs_info("dlookup_alloc_add %s, inode %lu, _dlookup_data %lu, _dlookup_data->inode %lu\n", _path,inode,_dlookup_data,_dlookup_data->inode);
 	pthread_rwlock_wrlock(dlookup_rwlock);
 
 	HASH_ADD_STR(dlookup_hash, path, _dlookup_data);
@@ -1274,7 +1031,6 @@ static inline struct inode *dlookup_alloc_add(	struct inode *inode, const char *
 
 static inline int dlookup_del(const char *path)
 {
-	//userfs_info("dlookup_del %s\n", path);
 	struct dlookup_data *_dlookup_data;
 
 	pthread_rwlock_wrlock(dlookup_rwlock);
@@ -1302,8 +1058,6 @@ void read_superblock(uint8_t dev);
 void read_root_inode(uint8_t dev);
 void load_files(struct inode * inode);
 void load_blktree(struct inode *inode);
-//int read_ondisk_inode(uint8_t dev, uint32_t inum, struct dinode *dip);
-//int sync_inode_ext_tree(uint8_t dev, struct inode *inode);
 struct inode* icreate( uint8_t type);
 struct inode* ialloc( uint32_t inum);
 int idealloc(struct inode *inode);
@@ -1329,9 +1083,6 @@ struct inode* nameiparent(char*, char*);
 int readi_unopt(struct inode*, uint8_t *, offset_t, uint32_t);
 int readi(struct inode*, uint8_t *, offset_t, uint32_t);
 void stati(struct inode*, struct stat *);
-//int add_to_log(struct inode*, uint8_t*, offset_t, uint32_t);
-//int check_log_invalidation(struct fcache_block *_fcache_block);
-//uint8_t *get_dirent_block(struct inode *dir_inode, offset_t offset);
 void show_libfs_stats(void);
 
 //APIs for debugging.
@@ -1353,18 +1104,7 @@ extern pthread_rwlock_t *shm_lru_rwlock;
 
 extern uint64_t *bandwidth_consumption;
 
-// Inodes per block.
-//#define IPB           (g_block_size_bytes / sizeof(struct dinode))
 
-// Block containing inode i
-/*
-#define IBLOCK(i, disk_sb)  ((i/IPB) + disk_sb.inode_start)
-
-static inline addr_t get_inode_block(uint8_t dev, uint32_t inum)
-{
-	return (inum / IPB) + disk_sb[dev].inode_start;
-}
-*/
 // Bitmap bits per block
 #define BPB           (g_block_size_bytes*8)
 
