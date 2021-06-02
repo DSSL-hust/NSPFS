@@ -44,7 +44,7 @@ Assume current directory is a project root directory.
 `4K`:test with 4K IO
 `1`:test with 1 thread
 
-2. **writing and compiling your program**
+2. **writing and compiling your program (for example, ./userfs/fio)**
 * Include <userfs/userfs_interface.h> and #include "posix/posix_interface.h" header files in the source file with the file IO code.
 * Upadte the POSIX interfaces (e.g., open, write, read, etc.) with our provided interfaces (e.g., userfs_posix_open, userfs_posix_write, userfs_posix_read, etc.).
 * Update its Makefile with new linked library.
