@@ -12,9 +12,9 @@ Assume current directory is a project root directory.
 1. **install PMDK**
 UserFS user PMDK library to write data to NVM.
 ```shell
-	git clone https://github.com/pmem/pmdk
-	cd pmdk
-	make
+    git clone https://github.com/pmem/pmdk
+    cd pmdk
+    make
 ```
 
 2. **build UserFS**
