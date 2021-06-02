@@ -27,7 +27,7 @@ UserFS user PMDK library to write data to NVM.
 ```shell
     insmod pmfs.ko
     mount -t pmfs -o init /dev/pmem0 /mnt/pmem_emul
-	dd if=/dev/zero of=/mnt/pmem_emul/.log bs=1M count=8
+    dd if=/dev/zero of=/mnt/pmem_emul/.log bs=1M count=8
 ```
 
 ## Running NSPFS
@@ -61,6 +61,7 @@ USERFS_FLAGS += -DINVALIDATION
 USERFS_FLAGS += -DKLIB_HASH
 ```
 `DUSERFS_PRINT`  -print more infomation
+
 `DCONCURRENT` - paralle IOs with threadpool
 
 
