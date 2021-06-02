@@ -50,7 +50,6 @@ Assume current directory is a project root directory.
 * Update its Makefile with new linked library.
 
 ## NSPFS Configuration
-1. NSPFS configuration
 
 In userfs/Makefile, search USERFS_FLAGS as keyword
 ```
